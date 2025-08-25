@@ -1,90 +1,104 @@
 # Phantom Agents: AI Customer Support Assistant
 
-## Overview
+content: _Phantom Agents_ is a full-stack application built for the NSUToblivion'25 hackathon. Inspired by the theme of spectral creativity, this project brings to life a "Phantom Agent"—an intelligent, 24/7 AI customer support assistant that works tirelessly in the background to solve real-world problems for Small and Medium-sized Enterprises (SMEs). This agent "haunts" a company's knowledge base (PDFs or DOCX files) to provide instant, accurate answers. It's designed to understand user emotions, handle complaints with empathy, and intelligently escalate complex issues to human agents, ensuring a seamless and efficient customer experience.
 
-**Phantom Agents** is a project for the NSUToblivion'25 hackathon. Inspired by the theme of spectral creativity, this project brings to life a "Phantom Agent"—an intelligent, 24/7 AI customer support assistant that works tirelessly in the background to solve real-world problems for Small and Medium-sized Enterprises (SMEs).
+# Live Demo & Links
 
-This agent "haunts" a company's knowledge base (PDFs or DOCX files) to provide instant, accurate answers. It's designed to understand user emotions, handle complaints with empathy, and intelligently escalate complex issues to human agents, ensuring a seamless and efficient customer experience.
+content:
 
-## Tech Stack
+- _Frontend (Vercel):_ [Link to your Vercel deployment]
+- _Backend API (Hugging Face):_ [Link to your Hugging Face Space]
+- _Video Demo:_ [Link to your YouTube/Loom video]
 
-* **Backend**: FastAPI, Uvicorn
-* **AI/ML Frameworks**:
-    * **Language Models**: Google Gemini (`gemini-1.5-flash-latest`)
-    * **Embeddings**: Sentence-Transformers (`all-MiniLM-L6-v2`)
-    * **Vector Database**: FAISS (Facebook AI Similarity Search)
-* **Core Libraries**: PyMuPDF (for PDFs), python-docx (for DOCX), NumPy
-* **Deployment**: Docker, Hugging Face Spaces
+# Tech Stack
 
-## Setup and Running Locally
+content:
+| Area | Technology |
+| :--- | :--- |
+| _Frontend_ | React, Next.js, Tailwind CSS |
+| _Backend_ | FastAPI, Uvicorn |
+| _AI/ML_ | Google Gemini (gemini-1.5-flash-latest), Sentence-Transformers (all-MiniLM-L6-v2), FAISS |
+| _Deployment_ | Vercel (Frontend), Docker & Hugging Face Spaces (Backend) |
 
-Follow these steps to set up and run the application on your local machine.
+# Features
 
-1.  **Clone the Repository**
-    ```bash
-    git clone <your-repo-url>
-    cd <your-repo-name>
-    ```
+content:
 
-2.  **Create a Virtual Environment**
-    ```bash
+- _Full-Stack Application:_ A complete solution with a polished React frontend and a powerful FastAPI backend.
+- _File Upload Interface:_ Users can directly upload .pdf and .docx files to create a knowledge base.
+- _Conversational Q\&A:_ Engages in natural, multi-turn conversations with users.
+- _Intelligent Triage System:_ Automatically analyzes user queries to detect intent (Question, Complaint, Escalate) and sentiment.
+- _Empathetic Responses:_ Dynamically adjusts its tone to handle user complaints with empathy.
+- _Smart Escalation:_ Recognizes when a user needs human intervention and provides a clear path for escalation.
+
+# Setup and Running Locally
+
+content: This project is a monorepo with two main parts: frontend and backend.
+
+## Backend Setup (FastAPI)
+
+content:
+
+1.  _Navigate to the backend directory:_
+
+    cd backend
+
+2.  _Create a Virtual Environment:_
+
     python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    ```
+    source venv/bin/activate # On Windows: venv\Scripts\activate
 
-3.  **Install Dependencies**
-    Install all required packages from the `requirements.txt` file.
-    ```bash
+3.  _Install Dependencies:_
+
     pip install -r requirements.txt
-    ```
 
-4.  **Create `.env` File**
-    Create a file named `.env` in the root directory and add your API keys:
-    ```env
-    API_KEY="your-secret-bearer-token"
+4.  _Create .env File:_ Create a .env file inside the backend folder and add your API keys:
+
+    API_KEY="06864514c746f45fb93a6e0421a052c7875d3d1fd841d870f397c9d50e4146f8"
     GEMINI_API_KEY="your-google-gemini-api-key"
-    ```
 
-5.  **Run the Application**
-    Start the FastAPI server using Uvicorn.
-    ```bash
+5.  _Run the Backend Server:_
+
     uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-    ```
-    The API will now be accessible at `http://127.0.0.1:8000`.
 
-## Features
+    The backend API will be running at http://127.0.0.1:8000.
 
-* **Multi-Format Knowledge Base**: Ingests and processes both `.pdf` and `.docx` files to build a comprehensive knowledge base.
-* **Conversational Q&A**: Engages in natural, multi-turn conversations with users.
-* **Intelligent Triage System**: Automatically analyzes user queries to detect intent (`Question`, `Complaint`, `Escalate`) and sentiment (`Positive`, `Negative`, `Neutral`).
-* **Empathetic Responses**: Dynamically adjusts its tone to handle user complaints with empathy and care.
-* **Smart Escalation**: Recognizes when a user needs human intervention and provides a clear path for escalation, bypassing the AI for critical issues.
-* **Stateful Memory**: Remembers the context of the current conversation and the active knowledge base.
-* **Single Unified API Endpoint**: A simple `/process` endpoint handles both initial document processing and subsequent chat messages.
+## Frontend Setup (React)
 
-## Technical Workflow
+content:
 
-The application is built on a sophisticated Retrieval-Augmented Generation (RAG) pipeline, divided into two main stages.
+1.  _Navigate to the frontend directory (from the root):_
 
-### 1. Ingestion Pipeline
+    cd frontend
 
-When a `document_url` is provided to the `/process` endpoint for the first time:
+2.  _Install Dependencies:_
 
-1.  **Download & Hash**: The document is downloaded, and a unique SHA256 hash is generated from its content. This hash acts as its ID.
-2.  **Cache Check**: The system checks if a knowledge base for this hash already exists. If so, ingestion is skipped.
-3.  **Parse Content**: Based on the file type (`.pdf` or `.docx`), a specific parser extracts text and structural elements. For PDFs, it intelligently identifies and removes repeating headers/footers.
-4.  **Chunking**: The extracted text is broken down into smaller, semantically meaningful chunks.
-5.  **Vectorize & Store**: Each chunk is converted into a vector embedding using the Sentence-Transformer model. These embeddings are stored in a FAISS index file (`.index`), and the corresponding text chunks are saved in a JSON file (`.json`).
+    npm install
 
-### 2. Inference Pipeline
+3.  _Run the Frontend Development Server:_
 
-For every query sent to the `/process` endpoint:
+    npm run dev
 
-1.  **Triage & Routing**: The user's query and conversation history are first sent to the Gemini model for a quick classification of **intent** and **sentiment**.
-2.  **Decision Making**: Based on the triage result, the pipeline routes the query:
-    * **Escalate**: If the intent is to escalate, the system immediately returns a pre-defined message to connect the user to a human agent.
-    * **Complaint/Negative**: If the intent is a complaint or the sentiment is negative, it proceeds down the "Empathetic Path."
-    * **Question/Neutral**: Otherwise, it proceeds down the "Standard Q&A Path."
-3.  **Semantic Search**: The user's query is converted into a vector embedding. This vector is used to search the FAISS index for the most relevant context chunks from the knowledge base.
-4.  **Answer Generation**: The original query, conversation history, and the retrieved context chunks are passed to the Gemini model with a dynamically selected prompt (either a standard Q&A prompt or an empathetic prompt).
-5.  **Response**: The generated answer is returned to the user.
+    The frontend application will be accessible at http://localhost:3000.
+
+# Technical Workflow
+
+content: The application is built on a sophisticated Retrieval-Augmented Generation (RAG) pipeline.
+
+## 1\. Ingestion Pipeline
+
+content: When a user _uploads a document_ via the frontend:
+
+1.  _File Upload & Hashing_: The file is sent to the /process endpoint. The backend generates a unique SHA256 hash from the file's content to act as its ID.
+2.  _Cache Check_: The system checks if a knowledge base for this hash already exists. If so, ingestion is skipped.
+3.  _Parse Content_: Based on the file type (.pdf or .docx), a specific parser extracts text and structural elements.
+4.  _Chunking & Vectorization_: The text is broken down into smaller chunks, which are then converted into vector embeddings and stored in a FAISS index.
+
+## 2\. Inference Pipeline
+
+content: For every subsequent query in the chat:
+
+1.  _Triage & Routing: The user's query and conversation history are sent to Gemini for a quick classification of \*\*intent_ and _sentiment_.
+2.  _Decision Making_: Based on the triage result, the pipeline routes the query to the appropriate path (Escalation, Empathetic, or Standard Q\&A).
+3.  _Semantic Search_: The query is used to search the FAISS index for the most relevant context.
+4.  _Answer Generation_: The retrieved context is passed to Gemini with a dynamically selected prompt to generate the final answer.
