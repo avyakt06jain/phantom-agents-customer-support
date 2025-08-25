@@ -1,23 +1,25 @@
 import requests
 import json
 import time
+import os
 
 # --- Configuration ---
 # The URL where your FastAPI application is running
 API_URL = "https://avyakt06jain-phantom-agents-customer-support.hf.space/process"
 
 # The Bearer token for authorization (use your actual key)
-API_KEY = "06864514c746f45fb93a6e0421a052c7875d3d1fd841d870f397c9d50e4146f8"
+API_KEY = "06864514c746f45fb93a6e0421a052c7875d3d1fd841d870f397c9d50e4146f8" # <-- IMPORTANT: Replace with your actual API_KEY from .env
 
-# The headers for the request
+# The headers for the request (Content-Type is handled by `requests` library for multipart/form-data)
 headers = {
-    "Content-Type": "application/json",
     "Accept": "application/json",
     "Authorization": f"Bearer {API_KEY}"
 }
 
 # --- Test Data ---
-DOCUMENT_URL = "https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D"
+# IMPORTANT: Make sure you have a file named 'policy.pdf' in the same directory as this script.
+# You can download the sample file from: https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D
+LOCAL_DOC_PATH = "policy.pdf" 
 
 # A list of questions to simulate a conversation
 CONVERSATIONAL_QUERIES = [
@@ -30,9 +32,14 @@ CONVERSATIONAL_QUERIES = [
 
 def run_conversational_test():
     """
-    Simulates a back-and-forth conversation with the API.
+    Simulates a back-and-forth conversation with the API using file uploads.
     """
-    print("--- Starting Conversational API Test ---")
+    if not os.path.exists(LOCAL_DOC_PATH):
+        print(f"❌ Error: Test document '{LOCAL_DOC_PATH}' not found.")
+        print("Please download the sample policy PDF and place it in the same directory as this script.")
+        return
+
+    print("--- Starting Conversational API Test (File Upload) ---")
     
     chat_history = []
     
@@ -40,21 +47,24 @@ def run_conversational_test():
         print(f"\n--- Turn {i+1} ---")
         print(f"User > {query}")
 
-        payload = {
+        # Prepare form data
+        data = {
             "query": query,
-            "history": chat_history
+            "history": json.dumps(chat_history) # History must be a JSON string
         }
-
-        # **IMPORTANT**: Only send the document_url on the VERY FIRST request
+        
+        files = {}
+        # **IMPORTANT**: Only send the document file on the VERY FIRST request
         if i == 0:
-            payload["document_url"] = DOCUMENT_URL
-            print("(Sending document_url for initial processing...)")
+            print(f"(Uploading '{LOCAL_DOC_PATH}' for initial processing...)")
+            files['document'] = (os.path.basename(LOCAL_DOC_PATH), open(LOCAL_DOC_PATH, 'rb'), 'application/pdf')
 
         start_time = time.time()
         
         try:
-            # Send the POST request
-            response = requests.post(API_URL, headers=headers, data=json.dumps(payload), timeout=300)
+            # Send the POST request with multipart/form-data
+            # `requests` handles the Content-Type header automatically when using `files`
+            response = requests.post(API_URL, headers=headers, data=data, files=files, timeout=300)
             
             end_time = time.time()
             print(f"Request completed in {end_time - start_time:.2f} seconds.")
@@ -79,14 +89,16 @@ def run_conversational_test():
                     print(json.dumps(error_data, indent=2))
                 except json.JSONDecodeError:
                     print(response.text)
-                # Stop the test if an error occurs
-                break
+                break # Stop the test on error
 
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
             break
+        finally:
+            # Important: Close the file if it was opened
+            if 'document' in files and files['document'][1]:
+                files['document'][1].close()
         
-        # Pause to simulate a real user
         time.sleep(1)
 
     print("\n--- Test Finished ---")

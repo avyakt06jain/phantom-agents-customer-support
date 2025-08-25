@@ -1,25 +1,26 @@
 import os
 import uvicorn
 import hashlib
-import requests
+import json # Added for parsing history string
 import faiss
 from datetime import datetime
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, HTTPException, Depends, status
+# Updated FastAPI imports for file uploads and form data
+from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
 
-# Import your custom pipeline functions
+# Import your custom pipeline functions (no changes here)
 from ingestion_pipeline.ingestionPipeline import run_ingestion_pipeline
 from inference_pipeline.inferencePipeline import run_inference_pipeline
 
 # -- Initial Setup --
 load_dotenv()
-app = FastAPI(title="Phantom Agents API - Single Endpoint")
+app = FastAPI(title="Phantom Agents API - File Upload")
 security = HTTPBearer()
 
 # -- Environment Variables & Constants --
@@ -31,86 +32,80 @@ if not all([API_KEY, GEMINI_API_KEY]):
 CACHE_DIR = "knowledge_base_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-# -- RAG State & Model Initialization --
+# -- RAG State & Model Initialization (Unchanged) --
 class RAGState:
-    """
-    Manages the state of the RAG application, including models and the
-    currently active document knowledge base.
-    """
     def __init__(self, embedding_model_name="all-MiniLM-L6-v2"):
         print("Initializing RAG state...")
         self.embedding_model = SentenceTransformer(embedding_model_name)
         genai.configure(api_key=GEMINI_API_KEY)
         self.generative_model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        
-        # In-memory cache for loaded knowledge bases (persists across requests)
         self.loaded_indexes: Dict[str, faiss.Index] = {}
         self.loaded_chunks: Dict[str, List[Dict]] = {}
-        
-        # Tracks the currently active document for the single-endpoint logic
         self.active_doc_hash: Optional[str] = None
         print("RAG state initialized successfully.")
 
 rag_state = RAGState()
 
 # -- Pydantic Models for API Schema --
+# ChatMessage is used to validate the structure of the parsed history
 class ChatMessage(BaseModel):
-    role: str = Field(..., description="Role of the message sender, 'user' or 'model'.")
-    content: str = Field(..., description="Content of the message.")
+    role: str
+    content: str
 
-class ProcessRequest(BaseModel):
-    query: str = Field(..., description="The user query.")
-    history: List[ChatMessage] = Field([], description="The history of the conversation.")
-    document_url: Optional[str] = Field(None, description="URL for a document to process. If omitted, uses the last processed document.")
-
+# ProcessRequest model is removed as we are now using Form data.
 class ProcessResponse(BaseModel):
-    answer: str = Field(..., description="The generated answer from the AI agent.")
-    document_hash: Optional[str] = Field(None, description="The hash of the document used for the response.")
+    answer: str
+    document_hash: Optional[str]
 
 # -- Helper Functions --
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
-def download_file(url: str, local_path: str):
-    try:
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(local_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"Could not download document from URL: {e}")
+# download_file function is removed as it's no longer needed.
 
-def get_file_hash(file_path: str) -> str:
+def get_file_hash_from_bytes(file_bytes: bytes) -> str:
+    """Generates a SHA256 hash from the file's byte content."""
     sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        while chunk := f.read(8192):
-            sha256.update(chunk)
+    sha256.update(file_bytes)
     return sha256.hexdigest()
 
-# -- API Endpoint --
+# -- API Endpoint (Modified for File Upload) --
 @app.post("/process", response_model=ProcessResponse, dependencies=[Depends(verify_api_key)], tags=["Core"])
-async def process_query(request: ProcessRequest):
+async def process_query(
+    query: str = Form(...),
+    history: str = Form("[]"),  # History is now a JSON string
+    document: Optional[UploadFile] = File(None) # Document is now an optional file upload
+):
     """
-    A single endpoint to handle both document ingestion and chat.
-    - If `document_url` is provided, it processes the document and makes it the active context.
-    - If `document_url` is null, it uses the previously processed document as context.
+    A single endpoint to handle both document ingestion (via file upload) and chat.
+    - If a `document` file is provided, it's processed and becomes the active context.
+    - If `document` is omitted, the previously processed document is used.
     """
     doc_hash_to_use = rag_state.active_doc_hash
     temp_file_path = None
 
     try:
-        # **Step 1: Handle Document Ingestion if URL is provided**
-        if request.document_url:
-            print(f"Document URL provided: {request.document_url}")
-            file_extension = ".pdf" if ".pdf" in request.document_url.lower() else ".docx"
-            temp_file_path = os.path.join(CACHE_DIR, f"temp_document{file_extension}")
+        # **Step 1: Handle Document Ingestion if a file is uploaded**
+        if document:
+            print(f"Document uploaded: {document.filename}")
             
-            download_file(request.document_url, temp_file_path)
-            current_doc_hash = get_file_hash(temp_file_path)
+            # Validate file type
+            if not (document.filename.lower().endswith('.pdf') or document.filename.lower().endswith('.docx')):
+                raise HTTPException(status_code=400, detail="Invalid file type. Please upload a .pdf or .docx file.")
             
-            # Set this document as the currently active one for this and future queries
+            # Read file content into memory
+            file_bytes = await document.read()
+            
+            # Generate hash and define temporary path
+            current_doc_hash = get_file_hash_from_bytes(file_bytes)
+            temp_file_path = os.path.join(CACHE_DIR, f"temp_{current_doc_hash}_{document.filename}")
+
+            # Save file temporarily for the ingestion pipeline
+            with open(temp_file_path, "wb") as f:
+                f.write(file_bytes)
+
+            # Set this document as the active one
             rag_state.active_doc_hash = current_doc_hash
             doc_hash_to_use = current_doc_hash
             
@@ -126,15 +121,20 @@ async def process_query(request: ProcessRequest):
             else:
                 print(f"Cache hit for {doc_hash_to_use}. Ingestion skipped.")
 
-        # **Step 2: Check if there is an active document to query**
+        # **Step 2: Check for active document**
         if not doc_hash_to_use:
-            raise HTTPException(status_code=400, detail="No document has been processed yet. Please provide a `document_url` in your first request.")
+            raise HTTPException(status_code=400, detail="No document has been processed. Please upload a document with your first request.")
 
-        # **Step 3: Run Inference**
+        # **Step 3: Parse history and run inference**
+        try:
+            history_list = json.loads(history)
+            history_dicts = [ChatMessage(**msg).model_dump() for msg in history_list]
+        except (json.JSONDecodeError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid 'history' format. It must be a valid JSON string representing a list of objects.")
+
         print(f"Running inference against document hash: {doc_hash_to_use}")
-        history_dicts = [msg.model_dump() for msg in request.history]
         answer = run_inference_pipeline(
-            query=request.query,
+            query=query,
             history=history_dicts,
             doc_hash=doc_hash_to_use,
             cache_dir=CACHE_DIR,
@@ -147,14 +147,13 @@ async def process_query(request: ProcessRequest):
         return ProcessResponse(answer=answer, document_hash=doc_hash_to_use)
 
     except HTTPException as e:
-        raise e  # Re-raise FastAPI exceptions
+        raise e
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
-        # Clean up the downloaded file after the request is complete
+        # Clean up the temporary file
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
