@@ -4,7 +4,7 @@ import time
 
 # --- Configuration ---
 # The URL where your FastAPI application is running
-API_URL = "http://127.0.0.1:8000/process"
+API_URL = "https://avyakt06jain-phantom-agents-customer-support.hf.space/process"
 
 # The Bearer token for authorization (use your actual key)
 API_KEY = "06864514c746f45fb93a6e0421a052c7875d3d1fd841d870f397c9d50e4146f8"
