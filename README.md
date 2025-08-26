@@ -6,9 +6,9 @@ content: _Phantom Agents_ is a full-stack application built for the NSUToblivion
 
 content:
 
-- _Frontend (Vercel):_ [Link to your Vercel deployment]
-- _Backend API (Hugging Face):_ [Link to your Hugging Face Space]
-- _Video Demo:_ [Link to your YouTube/Loom video]
+- _Frontend (Vercel):_ [https://phantom-agents-customer-support.vercel.app/]
+- _Backend API (Hugging Face):_ [https://avyakt06jain-phantom-agents-customer-support.hf.space/process]
+- _Video Demo:_ [https://github.com/avyakt06jain/phantom-agents-customer-support/blob/main/REC-20250826100138.mp4]
 
 # Tech Stack
 
